@@ -12,13 +12,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import com.example.y2akio_mobile.ui.GlassTab
+import com.example.y2akio_mobile.ui.GlassTabBar
+import com.example.y2akio_mobile.ui.GlassTabBarBottomGap
+import com.example.y2akio_mobile.ui.GlassTabBarHeight
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -68,32 +80,12 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(LocalLanguage provides settings.language) {
                 Y2AkioTheme(settings.theme) {
-                    Scaffold(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        bottomBar = {
-                            // One UI bottom tabs: flat bar on the canvas, soft pill behind the active tab.
-                            NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
-                                val colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onSurface,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    indicatorColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                NavigationBarItem(
-                                    selected = tab == 0, onClick = { tab = 0 }, colors = colors,
-                                    icon = { Icon(if (tab == 0) Icons.Filled.Home else Icons.Outlined.Home, contentDescription = null) },
-                                    label = { Text(tr("Nav.Home"), fontWeight = if (tab == 0) FontWeight.SemiBold else FontWeight.Normal) },
-                                )
-                                NavigationBarItem(
-                                    selected = tab == 1, onClick = { tab = 1 }, colors = colors,
-                                    icon = { Icon(if (tab == 1) Icons.Filled.Settings else Icons.Outlined.Settings, contentDescription = null) },
-                                    label = { Text(tr("Nav.Settings"), fontWeight = if (tab == 1) FontWeight.SemiBold else FontWeight.Normal) },
-                                )
-                            }
-                        },
-                    ) { padding ->
-                        val bottom = padding.calculateBottomPadding()
+                    // Screens are recorded into [backdrop]; the floating glass tab bar refracts them.
+                    val backdrop = rememberLayerBackdrop()
+                    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                    val bottom = navInset + GlassTabBarHeight + GlassTabBarBottomGap
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                      Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
                         if (tab == 0) {
                             HomeScreen(
                                 vm = homeViewModel,
@@ -114,6 +106,20 @@ class MainActivity : ComponentActivity() {
                         } else {
                             SettingsScreen(app, bottom)
                         }
+                      }
+                      GlassTabBar(
+                          backdrop = backdrop,
+                          tabs = listOf(
+                              GlassTab(tr("Nav.Home"), Icons.Outlined.Home, Icons.Filled.Home),
+                              GlassTab(tr("Nav.Settings"), Icons.Outlined.Settings, Icons.Filled.Settings),
+                          ),
+                          selectedIndex = tab,
+                          onSelect = { tab = it },
+                          modifier = Modifier
+                              .align(Alignment.BottomCenter)
+                              .navigationBarsPadding()
+                              .padding(bottom = GlassTabBarBottomGap),
+                      )
                     }
                 }
             }

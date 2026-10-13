@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.kyant.backdrop)
     implementation(libs.youtubedl.library)
     implementation(libs.youtubedl.ffmpeg)
     debugImplementation(libs.compose.ui.tooling)
