@@ -8,16 +8,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -28,10 +25,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.y2akio_mobile.download.Notifications
 import com.example.y2akio_mobile.ui.HomeScreen
@@ -75,48 +70,49 @@ class MainActivity : ComponentActivity() {
                 Y2AkioTheme(settings.theme) {
                     Scaffold(
                         containerColor = MaterialTheme.colorScheme.background,
-                        topBar = {
-                            Box(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                                Text(
-                                    tr("App.TitleBar"), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                )
-                            }
-                        },
                         bottomBar = {
-                            NavigationBar {
-                                NavigationBarItem(
-                                    selected = tab == 0, onClick = { tab = 0 },
-                                    icon = { Icon(Icons.Filled.Home, contentDescription = null) }, label = { Text(tr("Nav.Home")) },
+                            // One UI bottom tabs: flat bar on the canvas, soft pill behind the active tab.
+                            NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+                                val colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    indicatorColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 NavigationBarItem(
-                                    selected = tab == 1, onClick = { tab = 1 },
-                                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) }, label = { Text(tr("Nav.Settings")) },
+                                    selected = tab == 0, onClick = { tab = 0 }, colors = colors,
+                                    icon = { Icon(if (tab == 0) Icons.Filled.Home else Icons.Outlined.Home, contentDescription = null) },
+                                    label = { Text(tr("Nav.Home"), fontWeight = if (tab == 0) FontWeight.SemiBold else FontWeight.Normal) },
+                                )
+                                NavigationBarItem(
+                                    selected = tab == 1, onClick = { tab = 1 }, colors = colors,
+                                    icon = { Icon(if (tab == 1) Icons.Filled.Settings else Icons.Outlined.Settings, contentDescription = null) },
+                                    label = { Text(tr("Nav.Settings"), fontWeight = if (tab == 1) FontWeight.SemiBold else FontWeight.Normal) },
                                 )
                             }
                         },
                     ) { padding ->
-                        Column(Modifier.fillMaxSize()) {
-                            if (tab == 0) {
-                                HomeScreen(
-                                    vm = homeViewModel,
-                                    jobs = jobs,
-                                    banner = banner,
-                                    log = log,
-                                    history = history,
-                                    runtimeState = runtimeState,
-                                    onDismissBanner = { app.downloads.showBanner(null) },
-                                    onCancelJob = app.downloads::cancel,
-                                    onDismissJob = app.downloads::dismiss,
-                                    onClearFinishedJobs = app.downloads::clearFinished,
-                                    onClearLog = app.downloads::clearLog,
-                                    onDeleteHistory = app.history::remove,
-                                    onClearHistory = app.history::clear,
-                                    contentPadding = padding,
-                                )
-                            } else {
-                                SettingsScreen(app, padding)
-                            }
+                        val bottom = padding.calculateBottomPadding()
+                        if (tab == 0) {
+                            HomeScreen(
+                                vm = homeViewModel,
+                                jobs = jobs,
+                                banner = banner,
+                                log = log,
+                                history = history,
+                                runtimeState = runtimeState,
+                                onDismissBanner = { app.downloads.showBanner(null) },
+                                onCancelJob = app.downloads::cancel,
+                                onDismissJob = app.downloads::dismiss,
+                                onClearFinishedJobs = app.downloads::clearFinished,
+                                onClearLog = app.downloads::clearLog,
+                                onDeleteHistory = app.history::remove,
+                                onClearHistory = app.history::clear,
+                                bottomPadding = bottom,
+                            )
+                        } else {
+                            SettingsScreen(app, bottom)
                         }
                     }
                 }

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.example.y2akio_mobile.ui
 
 import android.content.ClipData
@@ -11,11 +9,15 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -32,8 +34,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,36 +48,31 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,7 +85,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -101,6 +99,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -122,6 +121,7 @@ import com.example.y2akio_mobile.model.MediaKind
 import com.example.y2akio_mobile.service.MediaGalleryService
 import com.example.y2akio_mobile.service.YtDlpRuntime
 import com.example.y2akio_mobile.ui.theme.BrandGradient
+import com.example.y2akio_mobile.ui.theme.OneUi
 import com.example.y2akio_mobile.ui.theme.tr
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -142,7 +142,7 @@ fun HomeScreen(
     onClearLog: () -> Unit,
     onDeleteHistory: (DownloadHistoryItem) -> Unit,
     onClearHistory: () -> Unit,
-    contentPadding: PaddingValues,
+    bottomPadding: Dp,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val toast by vm.toast.collectAsStateWithLifecycle()
@@ -161,41 +161,45 @@ fun HomeScreen(
         }
     }
 
-    LazyColumn(
-        contentPadding = PaddingValues(
-            start = 16.dp, end = 16.dp,
-            top = contentPadding.calculateTopPadding() + 8.dp,
-            bottom = contentPadding.calculateBottomPadding() + 24.dp,
-        ),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxSize(),
+    OneUiScreen(
+        title = "Y2Akio",
+        bottomPadding = bottomPadding,
+        expandedHeader = { HomeHeader() },
     ) {
-        item { Header() }
-        item { UrlBar(state, vm, runtimeState) }
+        item(key = "url") { UrlCard(state, vm, runtimeState) }
 
         banner?.let { b -> item(key = "banner-${b.id}") { BannerCard(b, onDismissBanner) } }
 
-        if (state.card != null) {
-            item(key = "card") { MediaCardView(state, vm::closeVideoCard) }
-        }
-        if (state.showOptions) {
-            item(key = "options") { OptionsCard(state, vm, pickFolder) }
-        }
+        if (state.card != null) item(key = "card") { MediaCardView(state, vm::closeVideoCard) }
+        if (state.showOptions) optionsSection(state, vm, pickFolder)
 
         state.playlist?.let { playlist ->
+            item(key = "playlist-sub") { SubHeader(playlist.title.ifBlank { "Playlist" }) }
             item(key = "playlist-head") {
-                PlaylistHeader(playlist.title, playlist.uploader, playlist.entries.size, state.playlistSelected.size, vm)
+                PlaylistHeader(playlist.uploader, playlist.entries.size, state.playlistSelected.size, vm)
             }
-            items(playlist.entries, key = { "pl-" + it.url }) { entry ->
-                PlaylistRow(entry.title, entry.durationDisplay, entry.thumbnailUrl, entry.url in state.playlistSelected,
-                    onToggle = { vm.togglePlaylistEntry(entry) }, onOpen = { vm.openPlaylistEntry(entry) })
+            item(key = "playlist-gap") { Spacer(Modifier.height(OneUi.CardGap)) }
+            itemsIndexed(playlist.entries, key = { _, e -> "pl-" + e.url }) { i, entry ->
+                Column(Modifier.groupItem(i, playlist.entries.size)) {
+                    PlaylistRow(entry.title, entry.durationDisplay, entry.thumbnailUrl, entry.url in state.playlistSelected,
+                        onToggle = { vm.togglePlaylistEntry(entry) }, onOpen = { vm.openPlaylistEntry(entry) })
+                    if (i < playlist.entries.size - 1) RowDivider(startInset = 140.dp)
+                }
             }
         }
 
         state.gallery?.let { post ->
+            item(key = "gallery-sub") { SubHeader(post.source) }
             item(key = "gallery-head") { GalleryHeader(post, state.gallerySelected.size, vm) }
-            items(post.items.chunked(3), key = { row -> "g-" + row.first().index }) { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item(key = "gallery-gap") { Spacer(Modifier.height(OneUi.CardGap)) }
+            val rows = post.items.chunked(3)
+            itemsIndexed(rows, key = { _, row -> "g-" + row.first().index }) { i, row ->
+                Row(
+                    Modifier
+                        .groupItem(i, rows.size)
+                        .padding(start = 10.dp, end = 10.dp, top = if (i == 0) 10.dp else 3.dp, bottom = if (i == rows.size - 1) 10.dp else 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     row.forEach { item ->
                         GalleryTile(post, item, item.index in state.gallerySelected, Modifier.weight(1f),
                             onTap = { vm.toggleGalleryItem(item.index) }, onLongPress = { viewer = item })
@@ -207,79 +211,143 @@ fun HomeScreen(
         }
 
         if (jobs.isNotEmpty()) {
-            item(key = "jobs") { JobsCard(jobs, onCancelJob, onDismissJob, onClearFinishedJobs) }
+            item(key = "jobs-sub") {
+                SectionHeaderRow(tr("Home.Downloads")) {
+                    if (jobs.any { !it.isActive }) AccentTextButton(tr("Home.Clear"), onClearFinishedJobs)
+                }
+            }
+            val ordered = jobs.asReversed()
+            itemsIndexed(ordered, key = { _, j -> "job-${j.id}" }) { i, job ->
+                Column(Modifier.groupItem(i, ordered.size)) {
+                    JobRow(job, onCancelJob, onDismissJob)
+                    if (i < ordered.size - 1) RowDivider(startInset = 72.dp)
+                }
+            }
         }
+
         item(key = "log") { LogCard(log, onClearLog) }
-        item(key = "history-head") { HistoryHeader(history.isEmpty(), onClearHistory) }
-        items(history, key = { "h-" + it.completedAt + it.fileUri }) { item -> HistoryRow(item, onDeleteHistory) }
+
+        item(key = "history-sub") {
+            SectionHeaderRow(tr("Home.DownloadHistory")) {
+                if (history.isNotEmpty()) AccentTextButton(tr("Home.ClearAll"), onClearHistory)
+            }
+        }
+        if (history.isEmpty()) {
+            item(key = "history-empty") {
+                RoundedGroup(contentPadding = PaddingValues(vertical = 28.dp, horizontal = OneUi.CardPadding)) {
+                    Text(
+                        tr("Home.HistoryEmpty"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                }
+            }
+        }
+        itemsIndexed(history, key = { _, h -> "h-" + h.completedAt + h.fileUri }) { i, item ->
+            Column(Modifier.groupItem(i, history.size)) {
+                HistoryRow(item, onDeleteHistory)
+                if (i < history.size - 1) RowDivider(startInset = 72.dp)
+            }
+        }
     }
 
     viewer?.let { item -> GalleryViewer(state.gallery, item) { viewer = null } }
 }
 
-// ─── Header / URL bar ───────────────────────────────────────────────────────
-
+/** Sub-header with a trailing accent action ("Clear All"). */
 @Composable
-private fun Header() {
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(R.drawable.main_logo), contentDescription = null, modifier = Modifier.height(96.dp).width(110.dp), contentScale = ContentScale.Fit)
-            Spacer(Modifier.width(4.dp))
-            Text("Y2", fontSize = 38.sp, fontWeight = FontWeight.Black)
-            Text("AKIO", fontSize = 38.sp, fontWeight = FontWeight.Black, style = TextStyle(brush = BrandGradient))
-        }
-        Text(tr("Home.Subtitle"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun SectionHeaderRow(title: String, action: @Composable () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = OneUi.CardPadding, end = 6.dp, top = 14.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = OneUi.SubHeaderStyle, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        Box(Modifier.heightIn(min = 40.dp), contentAlignment = Alignment.Center) { action() }
     }
 }
 
+// ─── Header / URL card ──────────────────────────────────────────────────────
+
 @Composable
-private fun UrlBar(state: HomeUiState, vm: HomeViewModel, runtimeState: YtDlpRuntime.State) {
+private fun HomeHeader() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            painterResource(R.drawable.main_logo), contentDescription = null,
+            modifier = Modifier.height(92.dp).width(104.dp), contentScale = ContentScale.Fit,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text("Y2", fontSize = 40.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
+        Text("AKIO", fontSize = 40.sp, fontWeight = FontWeight.Black, style = TextStyle(brush = BrandGradient))
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(tr("Home.Subtitle"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(2.dp))
+    Text(
+        tr("App.TitleBar"), style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp, letterSpacing = 1.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+    )
+}
+
+@Composable
+private fun UrlCard(state: HomeUiState, vm: HomeViewModel, runtimeState: YtDlpRuntime.State) {
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val analyze = { focus.clearFocus(); vm.analyze() }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
+    RoundedGroup(contentPadding = PaddingValues(16.dp)) {
+        TextField(
             value = state.url,
             onValueChange = vm::setUrl,
             placeholder = { Text(tr("Home.UrlPlaceholder"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { analyze() }),
+            leadingIcon = { Icon(Icons.Filled.Link, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             trailingIcon = {
                 if (state.url.isNotEmpty()) {
                     IconButton(onClick = { vm.setUrl("") }) { Icon(Icons.Filled.Close, contentDescription = tr("Home.Clear")) }
-                } else {
-                    IconButton(onClick = {
-                        val clip = context.getSystemService(ClipboardManager::class.java).primaryClip
-                        val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
-                        if (!text.isNullOrBlank()) vm.setUrl(text.trim())
-                    }) { Icon(Icons.Filled.ContentPaste, contentDescription = tr("Home.Paste")) }
                 }
             },
+            singleLine = true,
+            shape = RoundedCornerShape(22.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { analyze() }),
         )
-        Button(
-            onClick = analyze,
-            enabled = !state.analyzing && state.url.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(16.dp),
-        ) {
-            if (state.analyzing) {
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                Spacer(Modifier.width(10.dp))
-                Text(tr("Home.Analyzing"))
-            } else {
-                Text(tr("Home.Analyze"), fontWeight = FontWeight.SemiBold)
-            }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PillButton(
+                tr("Home.Paste"),
+                onClick = {
+                    val clip = context.getSystemService(ClipboardManager::class.java).primaryClip
+                    val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                    if (!text.isNullOrBlank()) vm.setUrl(text.trim())
+                },
+                icon = Icons.Filled.ContentPaste,
+                tonal = true,
+            )
+            PillButton(
+                if (state.analyzing) tr("Home.Analyzing") else tr("Home.Analyze"),
+                onClick = analyze,
+                enabled = !state.analyzing && state.url.isNotBlank(),
+                modifier = Modifier.weight(1f),
+                leading = if (state.analyzing) {
+                    { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                } else null,
+            )
         }
         when (runtimeState) {
-            YtDlpRuntime.State.Initializing -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+            YtDlpRuntime.State.Initializing -> Row(Modifier.padding(top = 12.dp, start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(12.dp), strokeWidth = 1.5.dp)
                 Spacer(Modifier.width(8.dp))
                 Text(tr("Home.Preparing"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            is YtDlpRuntime.State.Failed -> Text(runtimeState.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            is YtDlpRuntime.State.Failed -> Text(
+                runtimeState.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 12.dp, start = 6.dp),
+            )
             YtDlpRuntime.State.Ready -> Unit
         }
     }
@@ -287,139 +355,162 @@ private fun UrlBar(state: HomeUiState, vm: HomeViewModel, runtimeState: YtDlpRun
 
 @Composable
 private fun BannerCard(banner: Banner, onDismiss: () -> Unit) {
-    val (bg, fg) = if (banner.success)
-        MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
-    else MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-    Card(colors = CardDefaults.cardColors(containerColor = bg, contentColor = fg), shape = RoundedCornerShape(16.dp)) {
-        Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.Top) {
-            Icon(if (banner.success) Icons.Filled.CheckCircle else Icons.Filled.Error, contentDescription = null, modifier = Modifier.padding(top = 2.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(banner.title, fontWeight = FontWeight.SemiBold)
-                Text(banner.message, style = MaterialTheme.typography.bodySmall, maxLines = 8, overflow = TextOverflow.Ellipsis)
+    val accent = if (banner.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    Column(Modifier.padding(top = OneUi.CardGap)) {
+        RoundedGroup(contentPadding = PaddingValues(start = 20.dp, top = 16.dp, bottom = 16.dp, end = 8.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(if (banner.success) Icons.Filled.CheckCircle else Icons.Filled.ErrorOutline, null, tint = accent, modifier = Modifier.padding(top = 1.dp).size(22.dp))
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(banner.title, style = MaterialTheme.typography.titleSmall, color = accent)
+                    Text(banner.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Close, contentDescription = tr("Home.Dismiss"), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = tr("Home.Dismiss")) }
         }
     }
 }
 
-// ─── Single video card + options ────────────────────────────────────────────
+// ─── Media card + options ───────────────────────────────────────────────────
 
 @Composable
 private fun MediaCardView(state: HomeUiState, onClose: () -> Unit) {
     val card = state.card ?: return
-    SectionCard {
-        Row(verticalAlignment = Alignment.Top) {
-            Box(Modifier.width(140.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+    Column(Modifier.padding(top = OneUi.CardGap)) {
+        RoundedGroup(contentPadding = PaddingValues(12.dp)) {
+            Box(
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
                 if (card.thumbnailUrl.isNotBlank()) {
                     AsyncImage(model = card.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 }
                 if (card.duration.isNotBlank()) {
                     Text(
-                        card.duration, color = Color.White, fontSize = 11.sp,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 1.dp),
+                        card.duration, color = Color.White, style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), CircleShape).padding(horizontal = 10.dp, vertical = 3.dp),
                     )
                 }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(card.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                if (card.uploader.isNotBlank()) Text(card.uploader, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (state.video == null) {
-                    Spacer(Modifier.height(8.dp))
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (state.playlist != null) {
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(32.dp).background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                    ) { Icon(Icons.Filled.Close, contentDescription = tr("Home.Close"), tint = Color.White, modifier = Modifier.size(18.dp)) }
                 }
             }
-            if (state.playlist != null) {
-                IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = tr("Home.Close")) }
+            Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 14.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(card.title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), maxLines = 3, overflow = TextOverflow.Ellipsis)
+                if (card.uploader.isNotBlank()) Text(card.uploader, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (state.video == null) {
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(Modifier.fillMaxWidth().clip(CircleShape), strokeCap = StrokeCap.Round)
+                }
             }
         }
     }
 }
 
-@Composable
-private fun OptionsCard(state: HomeUiState, vm: HomeViewModel, pickFolder: (String) -> Unit) {
+private fun androidx.compose.foundation.lazy.LazyListScope.optionsSection(state: HomeUiState, vm: HomeViewModel, pickFolder: (String) -> Unit) {
     val o = state.options
-    val video = state.video
-    SectionCard {
-        SectionTitle(tr("Home.DownloadOptions"))
-
-        FieldLabel(tr("Home.FileFormat"))
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            SegmentedButton(selected = o.isVideo, onClick = { vm.updateOptions { it.copy(isVideo = true) } }, shape = SegmentedButtonDefaults.itemShape(0, 2)) {
-                Text(tr("Home.VideoMp4"))
-            }
-            SegmentedButton(selected = !o.isVideo, onClick = { vm.updateOptions { it.copy(isVideo = false) } }, shape = SegmentedButtonDefaults.itemShape(1, 2)) {
-                Text(tr("Home.AudioMusic"))
-            }
-        }
-
-        val best = tr("Home.BestQuality")
-        Dropdown(tr("Home.Quality"), state.qualityChoices.map { it to if (it == OptionsState.BEST) best else it }, o.quality, { q -> vm.updateOptions { it.copy(quality = q) } })
-
-        if (o.isVideo) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Dropdown(
-                    tr("Home.VideoFormat"), listOf("mp4" to "MP4", "mkv" to "MKV", "webm" to "WebM"), o.container,
-                    { c -> vm.updateOptions { it.copy(container = c) } }, Modifier.weight(1f), enabled = o.codec == "auto",
-                )
-                Dropdown(
-                    tr("Home.VideoCodec"),
-                    listOf(
-                        "auto" to tr("Home.CodecAuto"), "h264" to tr("Home.CodecH264"), "hevc" to tr("Home.CodecHevc"),
-                        "av1" to tr("Home.CodecAv1"), "vp9" to tr("Home.CodecVp9"), "mpeg4" to tr("Home.CodecMpeg4"),
-                    ),
-                    o.codec, { c -> vm.updateOptions { it.copy(codec = c) } }, Modifier.weight(1f),
-                )
-            }
-            if (o.codec != "auto") Text(tr("Home.CodecHint"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
-        } else {
-            Dropdown(
-                tr("Home.AudioFormat"),
-                listOf("mp3" to "MP3", "m4a" to "M4A", "aac" to "AAC", "flac" to "FLAC", "opus" to "Opus", "vorbis" to "Vorbis (OGG)", "wav" to "WAV", "alac" to "ALAC", "wma" to "WMA"),
-                o.audioFormat, { f -> vm.updateOptions { it.copy(audioFormat = f) } },
-            )
-        }
-
-        HorizontalDivider()
-        FieldLabel(tr("Home.FileNamePrefix"))
+    item(key = "opt-format") {
         Column {
-            CheckRow(tr("Home.PrefixDateTime"), o.prefixDateTime, { v -> vm.updateOptions { it.copy(prefixDateTime = v) } })
-            CheckRow(tr("Home.PrefixChannel"), o.prefixChannel, { v -> vm.updateOptions { it.copy(prefixChannel = v) } })
-            CheckRow(tr("Home.IncludeTitle"), o.includeTitle, { v -> vm.updateOptions { it.copy(includeTitle = v) } })
-        }
-
-        if (o.isVideo) {
-            HorizontalDivider()
-            CheckRow(tr("Home.DownloadSubtitles"), o.subtitlesEnabled, { v -> vm.updateOptions { it.copy(subtitlesEnabled = v) } })
-            AnimatedVisibility(o.subtitlesEnabled) { SubtitleOptions(state, vm) }
-        }
-
-        HorizontalDivider()
-        if (o.isVideo) FolderRow(tr("Home.VideoSaveLocation"), vm.folderLabel(o.videoFolder), tr("Home.ChooseFolder")) { pickFolder("video") }
-        else FolderRow(tr("Home.AudioSaveLocation"), vm.folderLabel(o.audioFolder), tr("Home.ChooseFolder")) { pickFolder("audio") }
-
-        HorizontalDivider()
-        FieldLabel(tr("Home.ExtraOptions"))
-        CheckRow(tr("Home.EmbedMetadata"), o.embedMetadata, { v -> vm.updateOptions { it.copy(embedMetadata = v) } })
-        Dropdown(
-            tr("Home.Thumbnail"),
-            listOf("embed" to tr("Home.ThumbnailEmbed"), "save" to tr("Home.ThumbnailSave"), "none" to tr("Home.ThumbnailNone")),
-            o.thumbnailMode, { m -> vm.updateOptions { it.copy(thumbnailMode = m) } },
-        )
-
-        if (video != null) {
-            Button(
-                onClick = vm::downloadNow,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                Icon(Icons.Filled.Download, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(tr("Home.DownloadNow"), fontWeight = FontWeight.SemiBold)
+            SubHeader(tr("Home.DownloadOptions"))
+            RoundedGroup(contentPadding = PaddingValues(top = 16.dp, bottom = 6.dp)) {
+                SegmentedPill(
+                    listOf(tr("Home.VideoMp4"), tr("Home.AudioMusic")),
+                    if (o.isVideo) 0 else 1,
+                    { i -> vm.updateOptions { it.copy(isVideo = i == 0) } },
+                    Modifier.padding(horizontal = 16.dp).padding(bottom = 6.dp),
+                )
+                val best = tr("Home.BestQuality")
+                ChoiceRow(tr("Home.Quality"), state.qualityChoices.map { it to if (it == OptionsState.BEST) best else it }, o.quality, { q -> vm.updateOptions { it.copy(quality = q) } })
+                RowDivider()
+                if (o.isVideo) {
+                    ChoiceRow(
+                        tr("Home.VideoCodec"),
+                        listOf(
+                            "auto" to tr("Home.CodecAuto"), "h264" to tr("Home.CodecH264"), "hevc" to tr("Home.CodecHevc"),
+                            "av1" to tr("Home.CodecAv1"), "vp9" to tr("Home.CodecVp9"), "mpeg4" to tr("Home.CodecMpeg4"),
+                        ),
+                        o.codec, { c -> vm.updateOptions { it.copy(codec = c) } },
+                        hint = if (o.codec != "auto") tr("Home.CodecHint") else null,
+                    )
+                    RowDivider()
+                    ChoiceRow(
+                        tr("Home.VideoFormat"), listOf("mp4" to "MP4", "mkv" to "MKV", "webm" to "WebM"),
+                        if (o.codec == "auto") o.container else "mp4", { c -> vm.updateOptions { it.copy(container = c) } }, enabled = o.codec == "auto",
+                    )
+                } else {
+                    ChoiceRow(
+                        tr("Home.AudioFormat"),
+                        listOf("mp3" to "MP3", "m4a" to "M4A", "aac" to "AAC", "flac" to "FLAC", "opus" to "Opus", "vorbis" to "Vorbis (OGG)", "wav" to "WAV", "alac" to "ALAC", "wma" to "WMA"),
+                        o.audioFormat, { f -> vm.updateOptions { it.copy(audioFormat = f) } },
+                    )
+                }
             }
-        } else if (state.playlist != null) {
-            Text(tr("Home.PlaylistHint"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    item(key = "opt-name") {
+        Column {
+            SubHeader(tr("Home.FileNamePrefix"))
+            RoundedGroup {
+                SwitchRow(tr("Home.PrefixDateTime"), o.prefixDateTime, { v -> vm.updateOptions { it.copy(prefixDateTime = v) } })
+                RowDivider()
+                SwitchRow(tr("Home.PrefixChannel"), o.prefixChannel, { v -> vm.updateOptions { it.copy(prefixChannel = v) } })
+                RowDivider()
+                SwitchRow(tr("Home.IncludeTitle"), o.includeTitle, { v -> vm.updateOptions { it.copy(includeTitle = v) } })
+            }
+        }
+    }
+
+    if (o.isVideo) {
+        item(key = "opt-subs") {
+            Column {
+                SubHeader(tr("Home.SubtitleOptions"))
+                RoundedGroup { SubtitleOptions(state, vm) }
+            }
+        }
+    }
+
+    item(key = "opt-save") {
+        Column {
+            SubHeader(tr("Home.ExtraOptions"))
+            RoundedGroup {
+                val folder = if (o.isVideo) o.videoFolder else o.audioFolder
+                PrefRow(
+                    if (o.isVideo) tr("Home.VideoSaveLocation") else tr("Home.AudioSaveLocation"),
+                    summary = vm.folderLabel(folder),
+                    summaryAccent = true,
+                    icon = Icons.Filled.Folder,
+                    showChevron = true,
+                    onClick = { pickFolder(if (o.isVideo) "video" else "audio") },
+                )
+                RowDivider(startInset = 72.dp)
+                SwitchRow(tr("Home.EmbedMetadata"), o.embedMetadata, { v -> vm.updateOptions { it.copy(embedMetadata = v) } })
+                RowDivider()
+                ChoiceRow(
+                    tr("Home.Thumbnail"),
+                    listOf("embed" to tr("Home.ThumbnailEmbed"), "save" to tr("Home.ThumbnailSave"), "none" to tr("Home.ThumbnailNone")),
+                    o.thumbnailMode, { m -> vm.updateOptions { it.copy(thumbnailMode = m) } },
+                )
+            }
+        }
+    }
+
+    item(key = "opt-action") {
+        Box(Modifier.padding(top = 20.dp, start = 8.dp, end = 8.dp)) {
+            if (state.video != null) {
+                PillButton(tr("Home.DownloadNow"), onClick = vm::downloadNow, icon = Icons.Filled.Download, modifier = Modifier.fillMaxWidth().height(54.dp))
+            } else if (state.playlist != null) {
+                Text(
+                    tr("Home.PlaylistHint"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                )
+            }
         }
     }
 }
@@ -428,67 +519,93 @@ private fun OptionsCard(state: HomeUiState, vm: HomeViewModel, pickFolder: (Stri
 private fun SubtitleOptions(state: HomeUiState, vm: HomeViewModel) {
     val o = state.options
     val video = state.video
-    Column(
-        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(12.dp)).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FieldLabel(tr("Home.SubtitleOptions"))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(o.subtitleEmbed, { vm.updateOptions { it.copy(subtitleEmbed = true) } })
-            Text(tr("Home.SubtitleEmbed"), style = MaterialTheme.typography.bodyMedium)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(!o.subtitleEmbed, { vm.updateOptions { it.copy(subtitleEmbed = false) } })
-            Text(tr("Home.SubtitleSeparate"), style = MaterialTheme.typography.bodyMedium)
-        }
+    var languagesDialog by remember { mutableStateOf(false) }
 
-        FieldLabel(tr("Home.IncludeTracks"))
-        CheckRow(tr("Home.ManualSubs"), o.subtitleManual, { v -> vm.updateOptions { it.copy(subtitleManual = v) } })
-        if (o.subtitleManual) {
-            val langs = buildList {
-                add("all" to tr("Home.AllLanguages"))
-                video?.manualSubtitleLanguages?.entries?.sortedBy { it.value }?.forEach { add(it.key to "${it.value} (${it.key})") }
-                add("none" to tr("Home.NoLanguage"))
-            }
-            Dropdown(tr("Home.Languages"), langs, o.manualLanguage, { l -> vm.updateOptions { it.copy(manualLanguage = l) } })
-        }
-        CheckRow(tr("Home.AutoSubs"), o.subtitleAuto, { v -> vm.updateOptions { it.copy(subtitleAuto = v) } })
-        if (o.subtitleAuto && video != null && video.autoSubtitleLanguages.isNotEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { vm.updateOptions { it.copy(autoLanguages = video.autoSubtitleLanguages.keys) } }) { Text(tr("Home.SelectAll")) }
-                TextButton(onClick = { vm.updateOptions { it.copy(autoLanguages = emptySet()) } }) { Text(tr("Home.DeselectAll")) }
-            }
-            Column(Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
-                video.autoSubtitleLanguages.entries.sortedBy { it.value }.forEach { (code, name) ->
-                    CheckRow("$name ($code)", code in o.autoLanguages, { v ->
-                        vm.updateOptions { it.copy(autoLanguages = if (v) it.autoLanguages + code else it.autoLanguages - code) }
-                    })
+    SwitchRow(tr("Home.DownloadSubtitles"), o.subtitlesEnabled, { v -> vm.updateOptions { it.copy(subtitlesEnabled = v) } })
+    AnimatedVisibility(o.subtitlesEnabled, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        Column {
+            RowDivider()
+            RadioRow(tr("Home.SubtitleEmbed"), o.subtitleEmbed) { vm.updateOptions { it.copy(subtitleEmbed = true) } }
+            RadioRow(tr("Home.SubtitleSeparate"), !o.subtitleEmbed) { vm.updateOptions { it.copy(subtitleEmbed = false) } }
+            RowDivider()
+            SwitchRow(tr("Home.ManualSubs"), o.subtitleManual, { v -> vm.updateOptions { it.copy(subtitleManual = v) } })
+            if (o.subtitleManual) {
+                val langs = buildList {
+                    add("all" to tr("Home.AllLanguages"))
+                    video?.manualSubtitleLanguages?.entries?.sortedBy { it.value }?.forEach { add(it.key to "${it.value} (${it.key})") }
+                    add("none" to tr("Home.NoLanguage"))
                 }
+                ChoiceRow(tr("Home.Languages"), langs, o.manualLanguage, { l -> vm.updateOptions { it.copy(manualLanguage = l) } })
             }
+            RowDivider()
+            SwitchRow(tr("Home.AutoSubs"), o.subtitleAuto, { v -> vm.updateOptions { it.copy(subtitleAuto = v) } })
+            if (o.subtitleAuto && video != null && video.autoSubtitleLanguages.isNotEmpty()) {
+                val count = o.autoLanguages.size
+                PrefRow(
+                    tr("Home.Languages"),
+                    summary = "$count / ${video.autoSubtitleLanguages.size}",
+                    summaryAccent = true,
+                    showChevron = true,
+                    onClick = { languagesDialog = true },
+                )
+            }
+            RowDivider()
+            ChoiceRow(tr("Home.SubtitleFormat"), listOf("srt" to "SRT", "vtt" to "VTT"), o.subtitleFormat, { f -> vm.updateOptions { it.copy(subtitleFormat = f) } })
         }
-        Dropdown(tr("Home.SubtitleFormat"), listOf("srt" to "SRT", "vtt" to "VTT"), o.subtitleFormat, { f -> vm.updateOptions { it.copy(subtitleFormat = f) } })
+    }
+
+    if (languagesDialog && video != null) {
+        AlertDialog(
+            onDismissRequest = { languagesDialog = false },
+            shape = RoundedCornerShape(OneUi.CardRadius),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            title = { Text(tr("Home.AutoSubs"), style = MaterialTheme.typography.titleLarge) },
+            text = {
+                Column {
+                    Row {
+                        AccentTextButton(tr("Home.SelectAll"), { vm.updateOptions { it.copy(autoLanguages = video.autoSubtitleLanguages.keys) } })
+                        AccentTextButton(tr("Home.DeselectAll"), { vm.updateOptions { it.copy(autoLanguages = emptySet()) } })
+                    }
+                    Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                        video.autoSubtitleLanguages.entries.sortedBy { it.value }.forEach { (code, name) ->
+                            val checked = code in o.autoLanguages
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .clickable { vm.updateOptions { it.copy(autoLanguages = if (checked) it.autoLanguages - code else it.autoLanguages + code) } }
+                                    .padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(checked, null, colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary))
+                                Spacer(Modifier.width(8.dp))
+                                Text("$name ($code)", style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { AccentTextButton(tr("Settings.Ok"), { languagesDialog = false }) },
+        )
     }
 }
 
 // ─── Playlist ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun PlaylistHeader(title: String, uploader: String, count: Int, selected: Int, vm: HomeViewModel) {
-    SectionCard {
-        Text(title.ifBlank { "Playlist" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+private fun PlaylistHeader(uploader: String, count: Int, selected: Int, vm: HomeViewModel) {
+    RoundedGroup(contentPadding = PaddingValues(start = OneUi.CardPadding, end = 16.dp, top = 18.dp, bottom = 16.dp)) {
         Text(
             listOf(tr("Home.PlaylistVideos", count), uploader).filter { it.isNotBlank() }.joinToString(" · "),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { vm.selectAllPlaylist(true) }) { Text(tr("Home.SelectAll")) }
-            OutlinedButton(onClick = { vm.selectAllPlaylist(false) }) { Text(tr("Home.DeselectAll")) }
+        Row(Modifier.padding(top = 4.dp)) {
+            AccentTextButton(tr("Home.SelectAll"), { vm.selectAllPlaylist(true) })
+            AccentTextButton(tr("Home.DeselectAll"), { vm.selectAllPlaylist(false) }, enabled = selected > 0)
         }
-        Button(onClick = vm::downloadPlaylist, enabled = selected > 0, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-            Icon(Icons.Filled.Download, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(if (selected > 0) "${tr("Home.DownloadSelected")} ($selected)" else tr("Home.DownloadSelected"))
-        }
+        PillButton(
+            if (selected > 0) "${tr("Home.DownloadSelected")} ($selected)" else tr("Home.DownloadSelected"),
+            onClick = vm::downloadPlaylist, enabled = selected > 0, icon = Icons.Filled.Download,
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, end = 6.dp),
+        )
     }
 }
 
@@ -498,18 +615,17 @@ private fun PlaylistRow(title: String, duration: String, thumbnail: String, sele
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
             .combinedClickable(onClick = onOpen, onLongClick = onToggle)
-            .padding(vertical = 2.dp),
+            .padding(start = 8.dp, end = OneUi.CardPadding, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(checked = selected, onCheckedChange = { onToggle() })
-        Box(Modifier.width(96.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        Checkbox(checked = selected, onCheckedChange = { onToggle() }, colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary))
+        Box(Modifier.width(84.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
             if (thumbnail.isNotBlank()) AsyncImage(thumbnail, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(duration, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -519,27 +635,29 @@ private fun PlaylistRow(title: String, duration: String, thumbnail: String, sele
 
 @Composable
 private fun GalleryHeader(post: MediaGalleryPost, selected: Int, vm: HomeViewModel) {
-    SectionCard {
+    RoundedGroup(contentPadding = PaddingValues(start = OneUi.CardPadding, end = 8.dp, top = 18.dp, bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f)) {
-                Text(post.displayTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(post.displayTitle, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), maxLines = 3, overflow = TextOverflow.Ellipsis)
                 val photos = post.items.count { !it.isVideo }
                 val videos = post.items.size - photos
                 val meta = buildList {
-                    add(post.source)
                     if (photos > 0) add(tr("Home.GalleryPhotoCount", photos))
                     if (videos > 0) add(tr("Home.GalleryVideoCount", videos))
                     add("@${post.author}")
                     if (post.nickname.isNotBlank() && post.nickname != post.displayTitle) add(post.nickname)
                 }
-                Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            IconButton(onClick = vm::closeGallery) { Icon(Icons.Filled.Close, contentDescription = tr("Home.Close")) }
+            IconButton(onClick = vm::closeGallery) { Icon(Icons.Filled.Close, contentDescription = tr("Home.Close"), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        Text(tr("Home.GalleryHint"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { vm.selectAllGallery(true) }) { Text(tr("Home.SelectAll")) }
-            OutlinedButton(onClick = { vm.selectAllGallery(false) }, enabled = selected > 0) { Text(tr("Home.DeselectAll")) }
+        Text(
+            tr("Home.GalleryHint"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp, end = 14.dp),
+        )
+        Row(Modifier.padding(top = 2.dp)) {
+            AccentTextButton(tr("Home.SelectAll"), { vm.selectAllGallery(true) })
+            AccentTextButton(tr("Home.DeselectAll"), { vm.selectAllGallery(false) }, enabled = selected > 0)
         }
     }
 }
@@ -554,60 +672,69 @@ private fun galleryRequest(context: Context, url: String?, referer: String?): Im
 @Composable
 private fun GalleryTile(post: MediaGalleryPost, item: MediaGalleryItem, selected: Boolean, modifier: Modifier, onTap: () -> Unit, onLongPress: () -> Unit) {
     val context = LocalContext.current
+    val shape = RoundedCornerShape(14.dp)
     Box(
         modifier
             .aspectRatio(0.75f)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .border(if (selected) 3.dp else 0.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(12.dp))
             .combinedClickable(onClick = onTap, onLongClick = onLongPress),
     ) {
         AsyncImage(
             model = galleryRequest(context, item.tileUrl, post.referer),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-        Text(
-            item.index.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.TopStart).padding(6.dp).background(Color.Black.copy(alpha = 0.6f), CircleShape).padding(horizontal = 7.dp, vertical = 2.dp),
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                val s = if (selected) 0.92f else 1f
+                scaleX = s; scaleY = s
+            }.clip(shape),
         )
         if (item.isVideo) {
-            Icon(Icons.Filled.PlayCircle, contentDescription = null, tint = Color.White, modifier = Modifier.align(Alignment.Center).size(36.dp))
+            Icon(Icons.Filled.PlayCircle, contentDescription = null, tint = Color.White, modifier = Modifier.align(Alignment.Center).size(34.dp))
         }
-        if (selected) {
-            Icon(
-                Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).background(Color.White, CircleShape),
-            )
-        }
-        if (item.sizeDisplay.isNotEmpty()) {
-            Text(
-                item.sizeDisplay, color = Color.White, fontSize = 10.sp,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(horizontal = 4.dp),
-            )
+        // One UI selection mark: round checkbox in the corner.
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(8.dp)
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.25f))
+                .border(1.5.dp, Color.White, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (selected) Icon(Icons.Filled.CheckCircle, null, tint = Color.White, modifier = Modifier.size(22.dp))
+            else Text(item.index.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
 private fun GalleryFooter(post: MediaGalleryPost, state: HomeUiState, vm: HomeViewModel, pickFolder: (String) -> Unit) {
-    SectionCard {
-        FolderRow(tr("Home.GallerySaveLocation"), vm.folderLabel(state.galleryFolder), tr("Home.ChooseFolder")) { pickFolder("gallery") }
-        Dropdown(
-            tr("Home.GallerySaveAs"),
-            listOf("folder" to tr("Home.GallerySaveFolder"), "zip" to tr("Home.GallerySaveZip")),
-            if (state.galleryAsZip) "zip" else "folder",
-            { vm.setGalleryZip(it == "zip") },
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(top = OneUi.CardGap)) {
+        RoundedGroup {
+            PrefRow(
+                tr("Home.GallerySaveLocation"), summary = vm.folderLabel(state.galleryFolder), summaryAccent = true,
+                icon = Icons.Filled.Folder, showChevron = true, onClick = { pickFolder("gallery") },
+            )
+            RowDivider(startInset = 72.dp)
+            ChoiceRow(
+                tr("Home.GallerySaveAs"),
+                listOf("folder" to tr("Home.GallerySaveFolder"), "zip" to tr("Home.GallerySaveZip")),
+                if (state.galleryAsZip) "zip" else "folder",
+                { vm.setGalleryZip(it == "zip") },
+            )
+        }
+        Row(Modifier.padding(top = 20.dp, start = 8.dp, end = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val selected = state.gallerySelected.size
-            FilledTonalButton(onClick = { vm.downloadGallery(selectedOnly = true) }, enabled = selected > 0, modifier = Modifier.weight(1f)) {
-                Text(if (selected > 0) "${tr("Home.DownloadSelected")} ($selected)" else tr("Home.DownloadSelected"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Button(onClick = { vm.downloadGallery(selectedOnly = false) }, modifier = Modifier.weight(1f)) {
-                Text("${tr("Home.GalleryDownloadAll")} (${post.items.size})", maxLines = 1)
-            }
+            PillButton(
+                if (selected > 0) "${tr("Home.DownloadSelected")} ($selected)" else tr("Home.DownloadSelected"),
+                onClick = { vm.downloadGallery(selectedOnly = true) }, enabled = selected > 0, tonal = true, modifier = Modifier.weight(1f),
+            )
+            PillButton(
+                "${tr("Home.GalleryDownloadAll")} (${post.items.size})",
+                onClick = { vm.downloadGallery(selectedOnly = false) }, modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -637,23 +764,19 @@ private fun GalleryViewer(post: MediaGalleryPost?, item: MediaGalleryItem, onClo
                     .graphicsLayer(scaleX = scale, scaleY = scale, translationX = offsetX, translationY = offsetY),
             )
             Text(
-                "${item.index} / ${post?.items?.size ?: 0}", color = Color.White,
-                modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
+                "${item.index} / ${post?.items?.size ?: 0}", color = Color.White, style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.align(Alignment.TopStart).padding(24.dp),
             )
-            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)) {
                 Icon(Icons.Filled.Close, contentDescription = tr("Home.Close"), tint = Color.White)
             }
             if (item.isVideo && item.urls.isNotEmpty()) {
-                Button(
-                    onClick = {
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.urls.first())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                    },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp),
-                ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(tr("Home.OpenInBrowser"))
-                }
+                PillButton(
+                    tr("Home.OpenInBrowser"),
+                    onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.urls.first())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } },
+                    icon = Icons.Filled.PlayArrow,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(40.dp),
+                )
             }
         }
     }
@@ -661,39 +784,44 @@ private fun GalleryViewer(post: MediaGalleryPost?, item: MediaGalleryItem, onClo
 
 // ─── Jobs / log / history ───────────────────────────────────────────────────
 
+/** Round tinted icon badge used at the start of list rows. */
 @Composable
-private fun JobsCard(jobs: List<JobState>, onCancel: (Long) -> Unit, onDismiss: (Long) -> Unit, onClearFinished: () -> Unit) {
-    SectionCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionTitle(tr("Home.Downloads"), Modifier.weight(1f))
-            if (jobs.any { !it.isActive }) TextButton(onClick = onClearFinished) { Text(tr("Home.Clear")) }
+private fun IconBadge(icon: ImageVector, tint: Color, background: Color) {
+    Box(Modifier.size(40.dp).clip(CircleShape).background(background), contentAlignment = Alignment.Center) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(21.dp))
+    }
+}
+
+@Composable
+private fun JobRow(job: JobState, onCancel: (Long) -> Unit, onDismiss: (Long) -> Unit) {
+    val (icon, tint) = when (job.status) {
+        JobStatus.Done -> Icons.Filled.CheckCircle to MaterialTheme.colorScheme.primary
+        JobStatus.Failed -> Icons.Filled.ErrorOutline to MaterialTheme.colorScheme.error
+        JobStatus.Canceled -> Icons.Filled.Close to MaterialTheme.colorScheme.onSurfaceVariant
+        else -> Icons.Filled.Download to MaterialTheme.colorScheme.primary
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconBadge(icon, tint, MaterialTheme.colorScheme.surfaceContainerHigh)
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(job.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (job.isActive) {
+                if (job.progress < 0) LinearProgressIndicator(Modifier.fillMaxWidth().clip(CircleShape), strokeCap = StrokeCap.Round)
+                else LinearProgressIndicator(progress = { job.progress / 100f }, modifier = Modifier.fillMaxWidth().clip(CircleShape), strokeCap = StrokeCap.Round, drawStopIndicator = {})
+            }
+            Text(
+                job.detail, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                color = if (job.status == JobStatus.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        jobs.asReversed().forEach { job ->
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val (icon, tint) = when (job.status) {
-                        JobStatus.Done -> Icons.Filled.CheckCircle to MaterialTheme.colorScheme.primary
-                        JobStatus.Failed -> Icons.Filled.Error to MaterialTheme.colorScheme.error
-                        JobStatus.Canceled -> Icons.Filled.Close to MaterialTheme.colorScheme.onSurfaceVariant
-                        else -> Icons.Filled.Download to MaterialTheme.colorScheme.primary
-                    }
-                    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(job.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    if (job.isActive) {
-                        TextButton(onClick = { onCancel(job.id) }) { Text(tr("Home.Cancel")) }
-                    } else {
-                        IconButton(onClick = { onDismiss(job.id) }) { Icon(Icons.Filled.Close, contentDescription = tr("Home.Dismiss"), modifier = Modifier.size(18.dp)) }
-                    }
-                }
-                if (job.isActive) {
-                    if (job.progress < 0) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    else LinearProgressIndicator(progress = { job.progress / 100f }, modifier = Modifier.fillMaxWidth())
-                }
-                Text(
-                    job.detail, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis,
-                    color = if (job.status == JobStatus.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        if (job.isActive) {
+            AccentTextButton(tr("Home.Cancel"), { onCancel(job.id) })
+        } else {
+            IconButton(onClick = { onDismiss(job.id) }) {
+                Icon(Icons.Filled.Close, contentDescription = tr("Home.Dismiss"), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -702,42 +830,33 @@ private fun JobsCard(jobs: List<JobState>, onCancel: (Long) -> Unit, onDismiss: 
 @Composable
 private fun LogCard(log: List<String>, onClear: () -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    SectionCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionTitle(tr("Home.DownloadLog"), Modifier.weight(1f))
-            if (expanded) TextButton(onClick = onClear) { Text(tr("Home.Clear")) }
-            IconButton(onClick = { expanded = !expanded }) {
-                Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
-            }
-        }
-        if (expanded) {
-            val scroll = rememberScrollState()
-            LaunchedEffect(log.size) { scroll.scrollTo(scroll.maxValue) }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(260.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(10.dp))
-                    .verticalScroll(scroll)
-                    .padding(10.dp),
+    Column(Modifier.padding(top = 14.dp)) {
+        RoundedGroup(contentPadding = PaddingValues(0.dp)) {
+            PrefRow(
+                tr("Home.DownloadLog"),
+                summary = if (log.isEmpty()) null else "${log.size}",
+                onClick = { expanded = !expanded },
             ) {
-                Text(
-                    log.takeLast(400).joinToString("\n"),
-                    fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 14.sp,
-                )
+                if (expanded && log.isNotEmpty()) AccentTextButton(tr("Home.Clear"), onClear)
+                Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            AnimatedVisibility(expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                val scroll = rememberScrollState()
+                LaunchedEffect(log.size) { scroll.scrollTo(scroll.maxValue) }
+                Box(
+                    Modifier
+                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                        .fillMaxWidth()
+                        .height(260.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .verticalScroll(scroll)
+                        .padding(14.dp),
+                ) {
+                    Text(log.takeLast(400).joinToString("\n"), fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun HistoryHeader(empty: Boolean, onClear: () -> Unit) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-            SectionTitle(tr("Home.DownloadHistory"), Modifier.weight(1f))
-            if (!empty) TextButton(onClick = onClear) { Text(tr("Home.ClearAll")) }
-        }
-        if (empty) Text(tr("Home.HistoryEmpty"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -747,53 +866,73 @@ private fun HistoryRow(item: DownloadHistoryItem, onDelete: (DownloadHistoryItem
     val copied = tr("Home.PathCopied")
     val noViewer = tr("Home.NoViewer")
     val shareTitle = tr("Home.Share")
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+    var menu by remember { mutableStateOf(false) }
+
+    val open = {
+        val view = Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(item.fileUri), item.mimeType.ifBlank { "*/*" })
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(view)
+        } catch (_: Exception) {
+            Toast.makeText(context, noViewer, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = open).padding(start = 16.dp, end = 4.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 4.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(
-                    when (item.kind) {
-                        MediaKind.Video -> Icons.Filled.Movie
-                        MediaKind.Audio -> Icons.Filled.MusicNote
-                        MediaKind.Image -> Icons.Filled.Image
-                    },
-                    contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 2.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(item.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    val time = SimpleDateFormat("HH:mm:ss d/M/yyyy", Locale.getDefault()).format(Date(item.completedAt))
-                    Text(
-                        "${item.kind} · ${item.qualityLabel} · ${item.folderLabel} · $time",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconButton(onClick = {
-                    val view = Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(item.fileUri), item.mimeType.ifBlank { "*/*" })
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                    try {
-                        context.startActivity(view)
-                    } catch (_: Exception) {
-                        Toast.makeText(context, noViewer, Toast.LENGTH_SHORT).show()
-                    }
-                }) { Icon(Icons.Filled.PlayArrow, contentDescription = tr("Home.Play")) }
-                IconButton(onClick = {
+        IconBadge(
+            when (item.kind) {
+                MediaKind.Video -> Icons.Filled.Movie
+                MediaKind.Audio -> Icons.Filled.MusicNote
+                MediaKind.Image -> Icons.Filled.Image
+            },
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.primaryContainer,
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(item.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val time = SimpleDateFormat("HH:mm · d/M/yyyy", Locale.getDefault()).format(Date(item.completedAt))
+            Text(
+                "${item.qualityLabel} · $time",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Text(item.folderLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Box {
+            IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            DropdownMenu(
+                expanded = menu, onDismissRequest = { menu = false },
+                shape = RoundedCornerShape(22.dp), containerColor = MaterialTheme.colorScheme.surfaceContainerLow, shadowElevation = 8.dp,
+            ) {
+                MenuEntry(tr("Home.Play"), Icons.Filled.PlayArrow) { menu = false; open() }
+                MenuEntry(tr("Home.CopyPath"), Icons.Filled.ContentCopy) {
+                    menu = false
                     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("path", item.displayPath))
                     Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
-                }) { Icon(Icons.Filled.ContentCopy, contentDescription = tr("Home.CopyPath")) }
-                IconButton(onClick = {
+                }
+                MenuEntry(shareTitle, Icons.Filled.Share) {
+                    menu = false
                     val send = Intent(Intent.ACTION_SEND).setType(item.mimeType.ifBlank { "*/*" })
                         .putExtra(Intent.EXTRA_STREAM, Uri.parse(item.fileUri))
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     runCatching { context.startActivity(Intent.createChooser(send, shareTitle).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                }) { Icon(Icons.Filled.Share, contentDescription = shareTitle) }
-                IconButton(onClick = { onDelete(item) }) { Icon(Icons.Filled.Delete, contentDescription = tr("Home.Delete")) }
+                }
+                MenuEntry(tr("Home.Delete"), Icons.Filled.Delete, destructive = true) { menu = false; onDelete(item) }
             }
         }
     }
+}
+
+@Composable
+private fun MenuEntry(text: String, icon: ImageVector, destructive: Boolean = false, onClick: () -> Unit) {
+    val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    DropdownMenuItem(
+        text = { Text(text, style = MaterialTheme.typography.bodyLarge, color = color) },
+        leadingIcon = { Icon(icon, null, tint = color, modifier = Modifier.size(20.dp)) },
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 2.dp),
+    )
 }
