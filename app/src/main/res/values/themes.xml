@@ -1,0 +1,13 @@
+<resources>
+    <style name="Theme.Y2akio_mobile" parent="android:Theme.Material.Light.NoActionBar">
+    </style>
+
+    <!-- Share receiver: never draws a window, finishes immediately after queueing the download. -->
+    <style name="Theme.Y2akio_mobile.Invisible" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>
