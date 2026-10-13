@@ -4,6 +4,7 @@ import android.app.Application
 import com.example.y2akio_mobile.download.DownloadManager
 import com.example.y2akio_mobile.download.Notifications
 import com.example.y2akio_mobile.service.GalleryResolver
+import com.example.y2akio_mobile.service.WebPageFetcher
 import com.example.y2akio_mobile.service.YtDlpRuntime
 import com.example.y2akio_mobile.service.YtDlpService
 import com.example.y2akio_mobile.settings.AppSettings
@@ -40,7 +41,7 @@ class Y2AkioApp : Application() {
         history = HistoryStore(this)
         runtime = YtDlpRuntime(this)
         ytDlp = YtDlpService(runtime::ensureReady)
-        gallery = GalleryResolver()
+        gallery = GalleryResolver(WebPageFetcher(this))
         storage = OutputStorage(this)
         downloads = DownloadManager(this, settings, history, storage, ytDlp, gallery)
 

@@ -18,7 +18,7 @@ class GalleryResolverLiveTest {
     @Test
     fun tiktokShortLinkResolvesToPhotoPost() = runBlocking {
         live()
-        val url = resolver.resolve("https://vt.tiktok.com/ZSboJUCDs/", null)
+        val url = resolver.resolve("https://vt.tiktok.com/ZSboeyo7a/", null)
         assertTrue(url, TikTokPhotoService.isPhotoUrl(url))
         val post = resolver.tryFetch(url, null)!!
         println("TikTok: ${post.items.size} item(s) by @${post.author}: ${post.title}")
