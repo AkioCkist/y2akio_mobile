@@ -3,12 +3,14 @@ package com.example.y2akio_mobile
 import android.Manifest
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.animation.DecelerateInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -42,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.y2akio_mobile.download.Notifications
+import com.example.y2akio_mobile.service.YtDlpRuntime
 import com.example.y2akio_mobile.ui.HomeScreen
 import com.example.y2akio_mobile.ui.HomeViewModel
 import com.example.y2akio_mobile.ui.SettingsScreen
@@ -56,20 +59,30 @@ class MainActivity : ComponentActivity() {
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val launchSplash = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val app = application as Y2AkioApp
+
+        // Keep startup behind the system splash until the download engine is usable. The deadline
+        // prevents a broken native runtime from trapping the user on the splash forever.
+        val splashDeadline = SystemClock.elapsedRealtime() + 12_000L
+        launchSplash.setKeepOnScreenCondition {
+            app.runtime.state.value == YtDlpRuntime.State.Initializing &&
+                SystemClock.elapsedRealtime() < splashDeadline
+        }
+
         // Hand-off from the system splash: fade + slight zoom instead of a hard cut.
-        splashScreen.setOnExitAnimationListener { view ->
-            view.animate()
+        launchSplash.setOnExitAnimationListener { provider ->
+            provider.view.animate()
                 .alpha(0f)
                 .scaleX(1.04f)
                 .scaleY(1.04f)
                 .setDuration(160)
                 .setInterpolator(DecelerateInterpolator())
-                .withEndAction { view.remove() }
+                .withEndAction { provider.remove() }
                 .start()
         }
-        val app = application as Y2AkioApp
 
         // Background progress lives in notifications — ask once on first launch.
         val prefs = getSharedPreferences("ui", MODE_PRIVATE)

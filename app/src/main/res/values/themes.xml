@@ -1,18 +1,19 @@
 <resources>
-    <!--
-        DayNight so the very first frame (and the system splash) already follows dark mode.
-        The splash uses a dedicated animated mark instead of the launcher icon.
-    -->
+    <!-- DayNight app theme applied after the launch splash. -->
     <style name="Theme.Y2akio_mobile" parent="android:Theme.DeviceDefault.DayNight">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@color/window_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowSplashScreenBackground">@color/window_bg</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_animated</item>
-        <item name="android:windowSplashScreenAnimationDuration">450</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Held until the embedded yt-dlp runtime is ready, then hands off to the app theme. -->
+    <style name="Theme.Y2akio_mobile.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_animated</item>
+        <item name="windowSplashScreenAnimationDuration">450</item>
+        <item name="postSplashScreenTheme">@style/Theme.Y2akio_mobile</item>
     </style>
 
     <!-- Share receiver: never draws a window, finishes immediately after queueing the download. -->

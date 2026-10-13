@@ -13,7 +13,6 @@ import com.example.y2akio_mobile.storage.OutputStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -60,9 +59,8 @@ class Y2AkioApp : Application() {
                 settings.applyNightMode()
             }
 
-            // Keep Python / yt-dlp / FFmpeg warm, but don't compete with the first Compose frame.
-            // An analyze/download can still call ensureReady directly during this short delay.
-            delay(1_500)
+            // The launcher splash waits for this one-time engine setup, so start it immediately and
+            // reveal Home only when Analyze can be used without a second "Preparing" phase.
             runCatching { runtime.ensureReady() }
         }
     }
