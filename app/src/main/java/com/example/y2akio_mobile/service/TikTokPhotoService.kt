@@ -12,6 +12,8 @@ import com.example.y2akio_mobile.util.str
 import com.example.y2akio_mobile.util.strings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import okhttp3.Request
 import org.json.JSONObject
 import java.net.URLDecoder
@@ -24,11 +26,11 @@ import java.net.URLDecoder
  */
 class TikTokPhotoService(
     /**
-     * Fallback for TikTok's WAF, which answers OkHttp's TLS fingerprint on Android with a JS
-     * challenge page: (url, cookies.txt text) → the page-data script text from a real browser
-     * engine (see [WebPageFetcher]). Null = OkHttp only.
+     * Real-browser page loader for when TikTok's WAF / rate limiter turns OkHttp away:
+     * (url, script ids, accept-predicate, cookies.txt text) → the first accepted `<script id=…>`
+     * text, from an off-screen WebView (see [WebPageFetcher]). Null = OkHttp only.
      */
-    private val browserFallback: (suspend (String, String?) -> String?)? = null,
+    private val browserFallback: (suspend (String, List<String>, (String) -> Boolean, String?) -> String?)? = null,
 ) {
     companion object {
         const val REFERER = "https://www.tiktok.com/"
@@ -78,12 +80,21 @@ class TikTokPhotoService(
         // The embed player ships the full image list and isn't behind the WAF that guards the
         // regular post pages (they answer non-browser clients with a JS challenge).
         tryEmbed(postId, user)?.let { return it }
+        browserFallback?.invoke(embedUrl(postId), listOf("__FRONTITY_CONNECT_STATE__"), { it.contains("imagePostInfo") || it.contains("\"code\"") }, null)
+            ?.let { parseEmbed(it, postId, user) }
+            ?.let { return it }
 
         for (candidate in candidates) {
             try {
                 var (html, _) = MediaGalleryService.getPage(candidate, cookieHeader)
                 if (isBotChallenge(html)) {
-                    val script = browserFallback?.invoke(candidate, cookiesText)
+                    val script = browserFallback?.invoke(
+                        candidate,
+                        listOf("__UNIVERSAL_DATA_FOR_REHYDRATION__", "SIGI_STATE"),
+                        // Wait for the item itself (or TikTok's status for it), not the page shell.
+                        { it.contains("\"imagePost\"") || it.contains("webapp.video-detail") },
+                        cookiesText,
+                    )
                     if (script == null) {
                         lastError = "TikTok answered with its bot-check page instead of the post. Try again in a moment."
                         continue
@@ -112,45 +123,54 @@ class TikTokPhotoService(
      * only — anything else returns null and falls through to the post page.
      */
     private suspend fun tryEmbed(postId: String, userFromUrl: String): MediaGalleryPost? {
-        try {
-            // TikTok rate-limits bursts with 429 / 503; a short backoff usually gets through.
-            var html = ""
-            for (attempt in 0 until 3) {
-                try {
-                    html = MediaGalleryService.getPage("https://www.tiktok.com/embed/v2/$postId", "").first
-                    break
-                } catch (e: MediaGalleryService.HttpStatusException) {
-                    if ((e.code != 429 && e.code != 503) || attempt == 2) throw e
-                    delay(1500L * (attempt + 1))
+        // TikTok's rate limiter answers bursts with 429 / 503 (and sometimes a 4xx that still
+        // carries the full page), with a window of tens of seconds: back off progressively.
+        for (attempt in 0 until 5) {
+            try {
+                val (code, html) = MediaGalleryService.execute(
+                    okhttp3.Request.Builder().url(embedUrl(postId)).header("Accept", "text/html,application/xhtml+xml,*/*;q=0.8").build(),
+                ).use { r -> r.code to withContext(Dispatchers.IO) { r.body.string() } }
+                if (html.contains("__FRONTITY_CONNECT_STATE__")) {
+                    val script = frontityRegex.find(html)?.groupValues?.get(1) ?: return null
+                    return parseEmbed(script, postId, userFromUrl)
                 }
+                if (code != 429 && code !in 500..599) return null
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // network hiccup: retry
             }
-            val root = parseJsonObject(frontityRegex.find(html)?.groupValues?.get(1) ?: return null) ?: return null
-            val data = findObject(root, 10) { it.opt("imagePostInfo") is JSONObject } ?: return null
-
-            val images = mutableListOf<MediaGalleryItem>()
-            for (img in data.obj("imagePostInfo").arr("displayImages").objects()) {
-                val urls = img.arr("urlList").strings()
-                    .sortedBy { if (it.contains(".jpeg", true) || it.contains(".jpg", true)) 0 else 1 }
-                if (urls.isEmpty()) continue
-                images.add(MediaGalleryItem(images.size + 1, urls = urls.toMutableList(), width = img.int("width"), height = img.int("height")))
-            }
-            if (images.isEmpty()) return null
-
-            val author = data.obj("authorInfos")
-            return MediaGalleryPost(
-                source = "TikTok",
-                id = data.obj("itemInfos").str("id").ifEmpty { postId },
-                author = author.str("uniqueId").ifBlank { userFromUrl.ifBlank { "tiktok" } },
-                nickname = author.str("nickName"),
-                title = data.obj("itemInfos").str("text").trim(),
-                items = images,
-                referer = REFERER,
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            return null
+            if (attempt < 4) delay(2000L * (attempt + 1))
         }
+        return null
+    }
+
+    private fun embedUrl(postId: String) = "https://www.tiktok.com/embed/v2/$postId"
+
+    /** Embed page data (`__FRONTITY_CONNECT_STATE__` JSON) → post, or null when it has no photos. */
+    private fun parseEmbed(script: String, postId: String, userFromUrl: String): MediaGalleryPost? {
+        val root = parseJsonObject(script) ?: return null
+        val data = findObject(root, 10) { it.opt("imagePostInfo") is JSONObject } ?: return null
+
+        val images = mutableListOf<MediaGalleryItem>()
+        for (img in data.obj("imagePostInfo").arr("displayImages").objects()) {
+            val urls = img.arr("urlList").strings()
+                .sortedBy { if (it.contains(".jpeg", true) || it.contains(".jpg", true)) 0 else 1 }
+            if (urls.isEmpty()) continue
+            images.add(MediaGalleryItem(images.size + 1, urls = urls.toMutableList(), width = img.int("width"), height = img.int("height")))
+        }
+        if (images.isEmpty()) return null
+
+        val author = data.obj("authorInfos")
+        return MediaGalleryPost(
+            source = "TikTok",
+            id = data.obj("itemInfos").str("id").ifEmpty { postId },
+            author = author.str("uniqueId").ifBlank { userFromUrl.ifBlank { "tiktok" } },
+            nickname = author.str("nickName"),
+            title = data.obj("itemInfos").str("text").trim(),
+            items = images,
+            referer = REFERER,
+        )
     }
 
     /** TikTok's WAF challenge: a stub page with none of the page-data scripts. */

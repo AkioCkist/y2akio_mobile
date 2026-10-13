@@ -31,12 +31,23 @@ class WebPageFetcher(private val context: Context) {
         cookieUrl: String,
         cookies: List<String> = emptyList(),
         timeoutMs: Long = 25_000,
-    ): String? = withTimeoutOrNull(timeoutMs) {
-        withContext(Dispatchers.Main) { load(url, scriptIds, cookieUrl, cookies) }
+        accept: (String) -> Boolean = { true },
+    ): String? {
+        var lastSeen: String? = null
+        return withTimeoutOrNull(timeoutMs) {
+            withContext(Dispatchers.Main) { load(url, scriptIds, cookieUrl, cookies, accept) { lastSeen = it } }
+        } ?: lastSeen // timed out: hand back the best page data seen (it may carry a status code)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private suspend fun load(url: String, scriptIds: List<String>, cookieUrl: String, cookies: List<String>): String? =
+    private suspend fun load(
+        url: String,
+        scriptIds: List<String>,
+        cookieUrl: String,
+        cookies: List<String>,
+        accept: (String) -> Boolean,
+        onSeen: (String) -> Unit,
+    ): String? =
         suspendCancellableCoroutine { cont ->
             val handler = Handler(Looper.getMainLooper())
             val cookieManager = CookieManager.getInstance()
@@ -47,6 +58,9 @@ class WebPageFetcher(private val context: Context) {
             web.settings.domStorageEnabled = true
             web.settings.blockNetworkImage = true
             web.settings.loadsImagesAutomatically = false
+            // Desktop Chrome UA: the mobile web build serves an "open in app" shell without the
+            // server-rendered item data.
+            web.settings.userAgentString = MediaGalleryService.USER_AGENT
             web.webViewClient = WebViewClient()
 
             var finished = false
@@ -68,7 +82,8 @@ class WebPageFetcher(private val context: Context) {
                     if (finished) return
                     web.evaluateJavascript(js) { raw ->
                         val text = decodeJsString(raw)
-                        if (!text.isNullOrBlank()) finish(text) else handler.postDelayed(this, 700)
+                        if (!text.isNullOrBlank()) onSeen(text)
+                        if (!text.isNullOrBlank() && accept(text)) finish(text) else handler.postDelayed(this, 700)
                     }
                 }
             }

@@ -10,11 +10,11 @@ import com.example.y2akio_mobile.model.MediaGalleryPost
 class GalleryResolver(browserFetcher: WebPageFetcher? = null) {
     private val tikTok = TikTokPhotoService(
         browserFetcher?.let { fetcher ->
-            { url: String, cookiesText: String? ->
+            { url: String, scriptIds: List<String>, accept: (String) -> Boolean, cookiesText: String? ->
                 // Only the imported tiktok.com cookies go into the WebView's jar.
                 val cookies = MediaGalleryService.buildCookieHeader(cookiesText) { MediaGalleryService.isHostOf(it, "tiktok.com") }
                     .split("; ").filter { it.isNotBlank() }
-                fetcher.fetchScriptText(url, listOf("__UNIVERSAL_DATA_FOR_REHYDRATION__", "SIGI_STATE"), "https://www.tiktok.com", cookies)
+                fetcher.fetchScriptText(url, scriptIds, "https://www.tiktok.com", cookies, accept = accept)
             }
         },
     )
