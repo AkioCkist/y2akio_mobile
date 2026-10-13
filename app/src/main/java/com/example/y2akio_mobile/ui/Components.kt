@@ -1,7 +1,6 @@
 package com.example.y2akio_mobile.ui
 
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -26,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -49,7 +47,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,28 +56,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.example.y2akio_mobile.ui.theme.OneUi
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.flow.filter
 
 // ─── Collapsing "viewing area" app bar ───────────────────────────────────────
 
 /**
- * One UI screen frame: a tall header (the "viewing area", ~⅓ of the screen) holding the big title,
- * which collapses into a 56dp toolbar as the list scrolls and snaps open/closed after a fling. The
- * list below is the "interaction area".
+ * One UI screen frame: a tall header (the "viewing area", ~⅓ of the screen) with the big title,
+ * scrolled away as the first list item, and a 56dp toolbar that fades in over it once collapsed.
+ * Releasing the list half-way through the header snaps it open or closed.
+ *
+ * Performance: nothing here changes layout while scrolling — the header is an ordinary list item
+ * and the fades are read inside `graphicsLayer`, so scrolling never recomposes the screen.
  */
 @Composable
 fun OneUiScreen(
@@ -95,102 +97,78 @@ fun OneUiScreen(
 ) {
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val density = LocalDensity.current
-        val statusBar = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
+        val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val collapsed = OneUi.CollapsedBarHeight + statusBar
         val expanded = (maxHeight * 0.34f).coerceIn(collapsed + 120.dp, 340.dp)
-        val collapsedPx = with(density) { collapsed.toPx() }
-        val expandedPx = with(density) { expanded.toPx() }
+        val rangePx = with(density) { (expanded - collapsed).toPx() }
 
-        var heightPx by remember(expandedPx) { mutableFloatStateOf(expandedPx) }
-        val scope = rememberCoroutineScope()
         val listState = rememberLazyListState()
-
-        val connection = remember(collapsedPx, expandedPx) {
-            object : NestedScrollConnection {
-                // Scrolling up collapses the header before the list moves.
-                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                    if (available.y >= 0) return Offset.Zero
-                    val next = (heightPx + available.y).coerceAtLeast(collapsedPx)
-                    val used = next - heightPx
-                    heightPx = next
-                    return Offset(0f, used)
-                }
-
-                // Scrolling down expands it only once the list is back at its top.
-                override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                    if (available.y <= 0) return Offset.Zero
-                    val next = (heightPx + available.y).coerceAtMost(expandedPx)
-                    val used = next - heightPx
-                    heightPx = next
-                    return Offset(0f, used)
-                }
-
-                // Never rest half-open: snap to the nearer state.
-                override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                    if (heightPx > collapsedPx && heightPx < expandedPx) {
-                        val target = if (heightPx - collapsedPx > (expandedPx - collapsedPx) / 2) expandedPx else collapsedPx
-                        animate(heightPx, target, animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) { v, _ -> heightPx = v }
-                    }
-                    return super.onPostFling(consumed, available)
-                }
+        val scope = rememberCoroutineScope()
+        // 1 = fully expanded, 0 = collapsed.
+        val progress = remember(listState, rangePx) {
+            derivedStateOf {
+                if (listState.firstVisibleItemIndex > 0) 0f
+                else (1f - listState.firstVisibleItemScrollOffset / rangePx).coerceIn(0f, 1f)
             }
         }
 
-        val progress = ((heightPx - collapsedPx) / (expandedPx - collapsedPx)).coerceIn(0f, 1f)
-        val headerHeight = with(density) { heightPx.toDp() }
-
-        Column(Modifier.fillMaxSize().nestedScroll(connection)) {
-            Box(Modifier.fillMaxWidth().height(headerHeight)) {
-                // Expanded title, vertically centred in the viewing area, fades as it collapses.
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.Center)
-                        .padding(top = statusBar, start = 28.dp, end = 28.dp)
-                        .alpha(((progress - 0.35f) / 0.65f).coerceIn(0f, 1f)),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    content = expandedHeader,
-                )
-                // Collapsed toolbar.
-                Row(
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .height(OneUi.CollapsedBarHeight)
-                        .padding(start = 24.dp, end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        title,
-                        modifier = Modifier.weight(1f).alpha((1f - progress * 2.5f).coerceIn(0f, 1f)),
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    actions()
-                }
-            }
-            LazyColumn(
-                state = listState,
-                contentPadding = PaddingValues(start = OneUi.ScreenMargin, end = OneUi.ScreenMargin, bottom = bottomPadding + 28.dp),
-                modifier = Modifier.fillMaxSize(),
-                content = content,
-            )
-        }
-        // Tap the collapsed title to jump back to the top.
-        if (progress == 0f) {
-            Box(
-                Modifier
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .fillMaxWidth(0.6f)
-                    .height(OneUi.CollapsedBarHeight)
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                        scope.launch {
-                            listState.animateScrollToItem(0)
-                            animate(heightPx, expandedPx) { v, _ -> heightPx = v }
+        // Never rest half-open: snap once the finger lifts.
+        LaunchedEffect(listState, rangePx) {
+            snapshotFlow { listState.isScrollInProgress }
+                .filter { !it }
+                .collect {
+                    if (listState.firstVisibleItemIndex == 0) {
+                        val offset = listState.firstVisibleItemScrollOffset.toFloat()
+                        if (offset > 0f && offset < rangePx) {
+                            listState.animateScrollBy(if (offset < rangePx / 2) -offset else rangePx - offset, spring(stiffness = Spring.StiffnessMediumLow))
                         }
-                    },
-            )
+                    }
+                }
+        }
+
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(start = OneUi.ScreenMargin, end = OneUi.ScreenMargin, bottom = bottomPadding + 28.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            item(key = "__oneui_header", contentType = "header") {
+                Box(Modifier.fillMaxWidth().height(expanded)) {
+                    Column(
+                        Modifier
+                            .align(Alignment.Center)
+                            .padding(top = statusBar, start = 16.dp, end = 16.dp)
+                            .graphicsLayer {
+                                val p = progress.value
+                                alpha = ((p - 0.35f) / 0.65f).coerceIn(0f, 1f)
+                                // Slight parallax + shrink, like One UI's viewing area.
+                                translationY = (1f - p) * rangePx * 0.35f
+                                val sc = 0.92f + 0.08f * p
+                                scaleX = sc; scaleY = sc
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        content = expandedHeader,
+                    )
+                }
+            }
+            content()
+        }
+
+        // Collapsed toolbar overlay (also covers the status bar once the header is gone).
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .graphicsLayer { alpha = (1f - progress.value * 2.5f).coerceIn(0f, 1f) }
+                .background(MaterialTheme.colorScheme.background)
+                .padding(top = statusBar)
+                .height(OneUi.CollapsedBarHeight)
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                    if (progress.value == 0f) scope.launch { listState.animateScrollToItem(0) }
+                }
+                .padding(start = 24.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            actions()
         }
     }
 }

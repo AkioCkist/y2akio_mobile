@@ -3,6 +3,7 @@ package com.example.y2akio_mobile
 import android.Manifest
 import android.content.Intent
 import android.os.Bundle
+import android.view.animation.DecelerateInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -57,6 +58,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Hand-off from the system splash: fade + slight zoom instead of a hard cut.
+        splashScreen.setOnExitAnimationListener { view ->
+            view.animate()
+                .alpha(0f)
+                .scaleX(1.08f)
+                .scaleY(1.08f)
+                .setDuration(280)
+                .setInterpolator(DecelerateInterpolator())
+                .withEndAction { view.remove() }
+                .start()
+        }
         val app = application as Y2AkioApp
 
         // Background progress lives in notifications — ask once on first launch.
@@ -70,11 +82,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settings by app.settings.state.collectAsStateWithLifecycle()
-            val jobs by app.downloads.jobs.collectAsStateWithLifecycle()
-            val banner by app.downloads.banner.collectAsStateWithLifecycle()
-            val log by app.downloads.log.collectAsStateWithLifecycle()
-            val history by app.history.items.collectAsStateWithLifecycle()
-            val runtimeState by app.runtime.state.collectAsStateWithLifecycle()
             var tab by rememberSaveable { mutableIntStateOf(0) }
             selectTab = { tab = it }
 
@@ -87,22 +94,7 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                       Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
                         if (tab == 0) {
-                            HomeScreen(
-                                vm = homeViewModel,
-                                jobs = jobs,
-                                banner = banner,
-                                log = log,
-                                history = history,
-                                runtimeState = runtimeState,
-                                onDismissBanner = { app.downloads.showBanner(null) },
-                                onCancelJob = app.downloads::cancel,
-                                onDismissJob = app.downloads::dismiss,
-                                onClearFinishedJobs = app.downloads::clearFinished,
-                                onClearLog = app.downloads::clearLog,
-                                onDeleteHistory = app.history::remove,
-                                onClearHistory = app.history::clear,
-                                bottomPadding = bottom,
-                            )
+                            HomeScreen(vm = homeViewModel, app = app, bottomPadding = bottom)
                         } else {
                             SettingsScreen(app, bottom)
                         }

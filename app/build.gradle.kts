@@ -20,8 +20,11 @@ android {
 
     buildTypes {
         release {
-            // yt-dlp's Python runtime is loaded reflectively by youtubedl-android; keep shrinking off.
-            isMinifyEnabled = false
+            // R8 + resource shrinking: smaller, AOT-friendly code. youtubedl-android / Jackson
+            // reflection is covered by src/main/keepRules/rules.keep.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Debug key so the release APK can be sideloaded directly.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -70,6 +73,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.kyant.backdrop)
+    // Installs the Compose libraries' baseline profiles on sideloaded installs (no Play Store).
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.youtubedl.library)
     implementation(libs.youtubedl.ffmpeg)
     debugImplementation(libs.compose.ui.tooling)

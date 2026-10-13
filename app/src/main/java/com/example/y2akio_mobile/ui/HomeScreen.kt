@@ -111,6 +111,8 @@ import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.example.y2akio_mobile.R
+import com.example.y2akio_mobile.Y2AkioApp
+import com.example.y2akio_mobile.download.DownloadManager
 import com.example.y2akio_mobile.download.Banner
 import com.example.y2akio_mobile.download.JobState
 import com.example.y2akio_mobile.download.JobStatus
@@ -128,24 +130,22 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun HomeScreen(
-    vm: HomeViewModel,
-    jobs: List<JobState>,
-    banner: Banner?,
-    log: List<String>,
-    history: List<DownloadHistoryItem>,
-    runtimeState: YtDlpRuntime.State,
-    onDismissBanner: () -> Unit,
-    onCancelJob: (Long) -> Unit,
-    onDismissJob: (Long) -> Unit,
-    onClearFinishedJobs: () -> Unit,
-    onClearLog: () -> Unit,
-    onDeleteHistory: (DownloadHistoryItem) -> Unit,
-    onClearHistory: () -> Unit,
-    bottomPadding: Dp,
-) {
+fun HomeScreen(vm: HomeViewModel, app: Y2AkioApp, bottomPadding: Dp) {
+    // Each flow is collected here (not at the Activity root) so a progress tick only recomposes
+    // the Home list, and the log is collected by the log card itself — only while it is open.
     val state by vm.state.collectAsStateWithLifecycle()
     val toast by vm.toast.collectAsStateWithLifecycle()
+    val jobs by app.downloads.jobs.collectAsStateWithLifecycle()
+    val banner by app.downloads.banner.collectAsStateWithLifecycle()
+    val history by app.history.items.collectAsStateWithLifecycle()
+    val runtimeState by app.runtime.state.collectAsStateWithLifecycle()
+    val downloads = app.downloads
+    val onDismissBanner = remember(downloads) { { downloads.showBanner(null) } }
+    val onCancelJob: (Long) -> Unit = remember(downloads) { { id -> downloads.cancel(id) } }
+    val onDismissJob: (Long) -> Unit = remember(downloads) { { id -> downloads.dismiss(id) } }
+    val onClearFinishedJobs = remember(downloads) { { downloads.clearFinished() } }
+    val onDeleteHistory: (DownloadHistoryItem) -> Unit = remember(app) { { item -> app.history.remove(item) } }
+    val onClearHistory = remember(app) { { app.history.clear() } }
     val context = LocalContext.current
     var viewer by remember { mutableStateOf<MediaGalleryItem?>(null) }
     var folderTarget by remember { mutableStateOf("video") }
@@ -225,7 +225,7 @@ fun HomeScreen(
             }
         }
 
-        item(key = "log") { LogCard(log, onClearLog) }
+        item(key = "log") { LogCard(downloads) }
 
         item(key = "history-sub") {
             SectionHeaderRow(tr("Home.DownloadHistory")) {
@@ -828,19 +828,17 @@ private fun JobRow(job: JobState, onCancel: (Long) -> Unit, onDismiss: (Long) ->
 }
 
 @Composable
-private fun LogCard(log: List<String>, onClear: () -> Unit) {
+private fun LogCard(downloads: DownloadManager) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.padding(top = 14.dp)) {
         RoundedGroup(contentPadding = PaddingValues(0.dp)) {
-            PrefRow(
-                tr("Home.DownloadLog"),
-                summary = if (log.isEmpty()) null else "${log.size}",
-                onClick = { expanded = !expanded },
-            ) {
-                if (expanded && log.isNotEmpty()) AccentTextButton(tr("Home.Clear"), onClear)
+            PrefRow(tr("Home.DownloadLog"), onClick = { expanded = !expanded }) {
+                if (expanded) AccentTextButton(tr("Home.Clear"), downloads::clearLog)
                 Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             AnimatedVisibility(expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                val log by downloads.log.collectAsStateWithLifecycle()
+                val text = remember(log) { log.takeLast(400).joinToString("\n") }
                 val scroll = rememberScrollState()
                 LaunchedEffect(log.size) { scroll.scrollTo(scroll.maxValue) }
                 Box(
@@ -853,7 +851,7 @@ private fun LogCard(log: List<String>, onClear: () -> Unit) {
                         .verticalScroll(scroll)
                         .padding(14.dp),
                 ) {
-                    Text(log.takeLast(400).joinToString("\n"), fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
+                    Text(text, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
                 }
             }
         }

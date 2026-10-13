@@ -2,4 +2,7 @@
 <resources>
     <color name="brand_pink">#F25EE7</color>
     <color name="brand_pink_light">#F58AFB</color>
+    <!-- Window / splash canvas: matches the Compose background so launch has no colour jump. -->
+    <color name="window_bg">#F4F4F6</color>
+    <color name="splash_ring">#1AC03AB8</color>
 </resources>

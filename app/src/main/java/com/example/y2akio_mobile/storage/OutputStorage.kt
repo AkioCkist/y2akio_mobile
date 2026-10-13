@@ -16,7 +16,7 @@ import java.io.File
  * `Download/Y2Akio` through MediaStore (no permission needed) or into a folder the user picked
  * through the Storage Access Framework.
  */
-class OutputStorage(private val context: Context) {
+class OutputStorage(private val context: Context, private val settings: AppSettings) {
 
     data class Saved(val uri: Uri, val displayPath: String, val mimeType: String)
 
@@ -32,7 +32,7 @@ class OutputStorage(private val context: Context) {
 
     /** "Download/Y2Akio[/sub]" or "<picked folder>[/sub]". */
     fun folderLabel(folder: String, subFolder: String? = null): String {
-        val base = AppSettings(context).folderLabel(folder)
+        val base = settings.folderLabel(folder)
         return if (subFolder.isNullOrBlank()) base else "$base/$subFolder"
     }
 

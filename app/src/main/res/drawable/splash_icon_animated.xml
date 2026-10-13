@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Splash mark (Android 12+ splash, icon without background: 288dp canvas, centre 192dp visible).
+    A soft halo, a pink gradient badge that pops in, a download arrow that drops into place and a
+    tray line that draws itself underneath.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="288dp"
+            android:height="288dp"
+            android:viewportWidth="288"
+            android:viewportHeight="288">
+
+            <group
+                android:name="badge"
+                android:pivotX="144"
+                android:pivotY="144"
+                android:scaleX="0.6"
+                android:scaleY="0.6">
+
+                <!-- Halo -->
+                <path
+                    android:name="halo"
+                    android:fillAlpha="0"
+                    android:fillColor="@color/splash_ring"
+                    android:pathData="M144,50a94,94 0,1 1,0 188a94,94 0,1 1,0 -188z" />
+
+                <!-- Badge -->
+                <path android:pathData="M144,72a72,72 0,1 1,0 144a72,72 0,1 1,0 -144z">
+                    <aapt:attr name="android:fillColor">
+                        <gradient
+                            android:endColor="#C93CC0"
+                            android:endX="200"
+                            android:endY="210"
+                            android:startColor="#F8A3FC"
+                            android:startX="90"
+                            android:startY="80"
+                            android:type="linear" />
+                    </aapt:attr>
+                </path>
+
+                <!-- Arrow -->
+                <group
+                    android:name="arrow"
+                    android:translateY="-34">
+                    <path
+                        android:name="arrowPath"
+                        android:fillAlpha="0"
+                        android:fillColor="#FFFFFF"
+                        android:pathData="M137,100 L151,100 Q155,100 155,104 L155,140 L168,140 Q173,140 170,144 L147.5,168 Q144,171.5 140.5,168 L118,144 Q115,140 120,140 L133,140 L133,104 Q133,100 137,100 Z" />
+                </group>
+
+                <!-- Tray -->
+                <path
+                    android:name="tray"
+                    android:pathData="M114,186 L174,186"
+                    android:strokeWidth="10"
+                    android:strokeColor="#FFFFFF"
+                    android:strokeLineCap="round"
+                    android:trimPathEnd="0" />
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <target android:name="badge">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator
+                    android:duration="480"
+                    android:interpolator="@android:interpolator/overshoot"
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.6"
+                    android:valueTo="1" />
+                <objectAnimator
+                    android:duration="480"
+                    android:interpolator="@android:interpolator/overshoot"
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.6"
+                    android:valueTo="1" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="halo">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="500"
+                android:interpolator="@android:interpolator/fast_out_slow_in"
+                android:propertyName="fillAlpha"
+                android:startOffset="200"
+                android:valueFrom="0"
+                android:valueTo="1" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="arrow">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="520"
+                android:interpolator="@android:interpolator/overshoot"
+                android:propertyName="translateY"
+                android:startOffset="180"
+                android:valueFrom="-34"
+                android:valueTo="0" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="arrowPath">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="260"
+                android:propertyName="fillAlpha"
+                android:startOffset="180"
+                android:valueFrom="0"
+                android:valueTo="1" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="tray">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="340"
+                android:interpolator="@android:interpolator/fast_out_slow_in"
+                android:propertyName="trimPathEnd"
+                android:startOffset="520"
+                android:valueFrom="0"
+                android:valueTo="1" />
+        </aapt:attr>
+    </target>
+</animated-vector>

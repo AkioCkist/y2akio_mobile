@@ -1,11 +1,13 @@
 package com.example.y2akio_mobile.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -127,5 +129,10 @@ fun Y2AkioTheme(theme: AppTheme, content: @Composable () -> Unit) {
         AppTheme.Light -> false
         AppTheme.Dark -> true
     }
-    MaterialTheme(colorScheme = if (dark) DarkColors else LightColors, typography = OneUiTypography, content = content)
+    val colors = if (dark) DarkColors else LightColors
+    MaterialTheme(colorScheme = colors, typography = OneUiTypography) {
+        // No Scaffold/Surface sits at the root (the glass tab bar layout replaced it), so provide
+        // the default content colour here — otherwise uncoloured Text falls back to black.
+        CompositionLocalProvider(LocalContentColor provides colors.onBackground, content = content)
+    }
 }

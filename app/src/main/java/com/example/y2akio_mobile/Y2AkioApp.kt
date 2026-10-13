@@ -38,11 +38,12 @@ class Y2AkioApp : Application() {
     override fun onCreate() {
         super.onCreate()
         settings = AppSettings(this)
+        settings.applyNightMode()
         history = HistoryStore(this)
         runtime = YtDlpRuntime(this)
         ytDlp = YtDlpService(runtime::ensureReady)
         gallery = GalleryResolver(WebPageFetcher(this))
-        storage = OutputStorage(this)
+        storage = OutputStorage(this, settings)
         downloads = DownloadManager(this, settings, history, storage, ytDlp, gallery)
 
         Notifications.createChannels(this, settings.current.language)

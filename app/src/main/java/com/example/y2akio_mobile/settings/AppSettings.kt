@@ -1,5 +1,6 @@
 package com.example.y2akio_mobile.settings
 
+import android.app.UiModeManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 enum class AppLanguage { English, Vietnamese }
 enum class AppTheme { System, Light, Dark }
@@ -66,7 +68,24 @@ class AppSettings(private val context: Context) {
     }
 
     fun setLanguage(language: AppLanguage) = update { putString("language", language.name) }
-    fun setTheme(theme: AppTheme) = update { putString("theme", theme.name) }
+
+    fun setTheme(theme: AppTheme) {
+        update { putString("theme", theme.name) }
+        applyNightMode()
+    }
+
+    /**
+     * Tells the system the app's own light/dark choice, so the window background and the launch
+     * splash screen follow it from the very first frame (not just the system setting).
+     */
+    fun applyNightMode() {
+        val mode = when (current.theme) {
+            AppTheme.System -> UiModeManager.MODE_NIGHT_AUTO
+            AppTheme.Light -> UiModeManager.MODE_NIGHT_NO
+            AppTheme.Dark -> UiModeManager.MODE_NIGHT_YES
+        }
+        runCatching { context.getSystemService(UiModeManager::class.java).setApplicationNightMode(mode) }
+    }
 
     fun setVideoSaveFolder(uri: Uri?) = setFolder("videoFolder", uri)
     fun setAudioSaveFolder(uri: Uri?) = setFolder("audioFolder", uri)
@@ -88,12 +107,18 @@ class AppSettings(private val context: Context) {
     fun setShareGalleryZip(zip: Boolean) = update { putBoolean("shareGalleryZip", zip) }
     fun setShareEmbedThumbnail(embed: Boolean) = update { putBoolean("shareEmbedThumbnail", embed) }
 
+    // Resolving a tree URI's display name is a ContentResolver query: do it once per folder, not
+    // on every recomposition.
+    private val labelCache = ConcurrentHashMap<String, String>()
+
     /** Human label for a save folder setting ("Download/Y2Akio" or the picked folder's name). */
     fun folderLabel(folder: String): String {
         if (folder.isBlank()) return DEFAULT_FOLDER_LABEL
-        return runCatching { DocumentFile.fromTreeUri(context, Uri.parse(folder))?.name }.getOrNull()
-            ?: Uri.parse(folder).lastPathSegment?.substringAfterLast(':')
-            ?: folder
+        return labelCache.getOrPut(folder) {
+            runCatching { DocumentFile.fromTreeUri(context, Uri.parse(folder))?.name }.getOrNull()
+                ?: Uri.parse(folder).lastPathSegment?.substringAfterLast(':')
+                ?: folder
+        }
     }
 
     // ─── Cookies ──────────────────────────────────────────────────────────────
