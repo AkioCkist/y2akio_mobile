@@ -127,6 +127,7 @@ class DownloadManager(
 
     /** Share-sheet job: gallery post when the link is one, else yt-dlp with the saved share defaults. */
     fun enqueueShared(sharedUrl: String): Long = launchJob(sharedUrl) { id ->
+        settings.awaitLoaded()
         val s = settings.current
         val cookiesText = settings.decryptCookies()
         update(id) { it.copy(detail = t("Home.Analyzing")) }

@@ -1,0 +1,5 @@
+# Compile Y2Akio's startup and first-screen code ahead of time. Compose, Lifecycle, Coil and
+# coroutines contribute their own consumer profiles; these rules cover this app's generated
+# composable/lambda classes which library profiles cannot name.
+Lcom/example/y2akio_mobile/**;
+HSPLcom/example/y2akio_mobile/**->**(**)**

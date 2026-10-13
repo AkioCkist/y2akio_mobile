@@ -161,6 +161,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             var cookies: java.io.File? = null
             try {
+                y2.settings.awaitLoaded()
                 val cookiesText = y2.settings.decryptCookies()
                 // Share links (facebook.com/share/…, vt.tiktok.com/…) only reveal a photo post or a
                 // story after their redirects, so resolve them before routing.

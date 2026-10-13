@@ -13,7 +13,9 @@ import com.example.y2akio_mobile.storage.OutputStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Holds the app-wide singletons (settings, history, yt-dlp runtime, download queue). */
@@ -38,7 +40,6 @@ class Y2AkioApp : Application() {
     override fun onCreate() {
         super.onCreate()
         settings = AppSettings(this)
-        settings.applyNightMode()
         history = HistoryStore(this)
         runtime = YtDlpRuntime(this)
         ytDlp = YtDlpService(runtime::ensureReady)
@@ -46,13 +47,22 @@ class Y2AkioApp : Application() {
         storage = OutputStorage(this, settings)
         downloads = DownloadManager(this, settings, history, storage, ytDlp, gallery)
 
-        Notifications.createChannels(this, settings.current.language)
-
         appScope.launch(Dispatchers.IO) {
             // Leftovers of a process that was killed mid-download: plaintext cookies and work folders.
             settings.cleanupStaleCookieFiles()
             File(cacheDir, "jobs").deleteRecursively()
-            // Unpack Python / yt-dlp / FFmpeg early so the first analyze doesn't wait for it.
+
+            // Preferences are disk-backed. Apply them after the first frame can be prepared instead
+            // of blocking Application.onCreate; re-creating channels also updates localized names.
+            settings.awaitLoaded()
+            Notifications.createChannels(this@Y2AkioApp, settings.current.language)
+            withContext(Dispatchers.Main.immediate) {
+                settings.applyNightMode()
+            }
+
+            // Keep Python / yt-dlp / FFmpeg warm, but don't compete with the first Compose frame.
+            // An analyze/download can still call ensureReady directly during this short delay.
+            delay(1_500)
             runCatching { runtime.ensureReady() }
         }
     }

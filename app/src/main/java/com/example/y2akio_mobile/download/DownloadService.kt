@@ -38,6 +38,9 @@ class DownloadService : Service() {
         }
 
         val lang = app.settings.current.language
+        // Application startup creates channels asynchronously. A share-sheet job can reach the
+        // service first, so guarantee the foreground channel exists before startForeground.
+        Notifications.createChannels(this, lang)
         startForeground(
             Notifications.FOREGROUND_ID,
             Notifications.progress(this, Strings.get("Job.BackgroundStarted", lang), Strings.get("Job.Starting", lang), -1f, null),

@@ -62,9 +62,9 @@ class MainActivity : ComponentActivity() {
         splashScreen.setOnExitAnimationListener { view ->
             view.animate()
                 .alpha(0f)
-                .scaleX(1.08f)
-                .scaleY(1.08f)
-                .setDuration(280)
+                .scaleX(1.04f)
+                .scaleY(1.04f)
+                .setDuration(160)
                 .setInterpolator(DecelerateInterpolator())
                 .withEndAction { view.remove() }
                 .start()

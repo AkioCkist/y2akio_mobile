@@ -6,9 +6,14 @@ import android.content.SharedPreferences
 import android.net.Uri
 import androidx.core.content.edit
 import androidx.documentfile.provider.DocumentFile
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -39,10 +44,31 @@ data class SettingsData(
  */
 class AppSettings(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val loaded = CompletableDeferred<Unit>()
+    private val stateLock = Any()
+    @Volatile private var hasLocalUpdate = false
 
-    private val _state = MutableStateFlow(load())
+    // SharedPreferences loads its XML lazily. Publishing defaults first keeps that disk wait off the
+    // main thread; callers which require persisted values can await [awaitLoaded].
+    private val _state = MutableStateFlow(SettingsData())
     val state: StateFlow<SettingsData> = _state.asStateFlow()
     val current: SettingsData get() = _state.value
+
+    init {
+        scope.launch {
+            try {
+                val initial = runCatching { load() }.getOrDefault(SettingsData())
+                synchronized(stateLock) {
+                    _state.value = if (hasLocalUpdate) load() else initial
+                }
+            } finally {
+                loaded.complete(Unit)
+            }
+        }
+    }
+
+    suspend fun awaitLoaded() = loaded.await()
 
     private fun load() = SettingsData(
         language = enumOr(prefs.getString("language", null), AppLanguage.Vietnamese),
@@ -63,8 +89,11 @@ class AppSettings(private val context: Context) {
         runCatching { enumValueOf<T>(name ?: "") }.getOrDefault(fallback)
 
     private fun update(block: SharedPreferences.Editor.() -> Unit) {
-        prefs.edit(commit = true, action = block)
-        _state.value = load()
+        synchronized(stateLock) {
+            hasLocalUpdate = true
+            prefs.edit(commit = true, action = block)
+            _state.value = load()
+        }
     }
 
     fun setLanguage(language: AppLanguage) = update { putString("language", language.name) }

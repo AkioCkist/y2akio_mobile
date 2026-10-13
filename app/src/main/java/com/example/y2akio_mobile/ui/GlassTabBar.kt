@@ -88,7 +88,7 @@ fun GlassTabBar(
                 shape = { CircleShape },
                 effects = {
                     vibrancy()
-                    blur(10.dp.toPx())
+                    blur(4.dp.toPx())
                     lens(18.dp.toPx(), 26.dp.toPx())
                 },
                 onDrawSurface = { drawRect(surfaceTint) },
